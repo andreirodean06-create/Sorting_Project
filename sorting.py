@@ -1,6 +1,7 @@
 import random
 import string
 import time
+import multiprocessing
 
 
 def bubble_sort(arr):
@@ -209,6 +210,7 @@ def generate_data(length, data_type):
     return arr
 
 
+
 algorithms = {
     1: ("Bubble Sort", bubble_sort),
     2: ("Selection Sort", selection_sort),
@@ -221,15 +223,19 @@ algorithms = {
 
 
 def benchmark():
-    sizes = [20, 50, 100, 500, 1000]
+    sizes = [20, 50, 100, 500, 1000, 5000, 10000, 20000, 40000, 100000, 500000]
     types = ["random", "sorted", "reverse", "almost", "flat"]
 
+    TIME_LIMIT = 5.0 
+
     overall_stats = {
-        key: {"time": 0.0, "comps": 0, "swaps": 0} 
+        key: {"time": 0.0, "comps": 0, "swaps": 0, "completed_runs": 0} 
         for key in algorithms
     }
-    
-    total_scenarios = len(sizes) * len(types)
+
+    banned = {
+        key: {dt: False for dt in types} for key in algorithms
+    }
 
     print("\n========== BENCHMARK MODE ==========\n")
 
@@ -240,10 +246,14 @@ def benchmark():
             print("-" * 55)
 
             for key, (name, algo) in algorithms.items():
+                if banned[key][data_type]:
+                    print(f"{name:<15} | {'SKIPPED':<10} | {'(Too slow on previous size)'}")
+                    continue
+
                 total_time = 0
                 total_comps = 0
                 total_swaps = 0
-                repeats = 3
+                repeats = 1
 
                 for _ in range(repeats):
                     data = generate_data(size, data_type)
@@ -260,23 +270,34 @@ def benchmark():
                 avg_comps = total_comps // repeats
                 avg_swaps = total_swaps // repeats
 
+                # Add to overall stats
                 overall_stats[key]["time"] += avg_time
                 overall_stats[key]["comps"] += avg_comps
                 overall_stats[key]["swaps"] += avg_swaps
+                overall_stats[key]["completed_runs"] += 1
 
                 print(f"{name:<15} | {avg_time:.6f}   | {avg_comps:<12} | {avg_swaps}")
 
-    print("\n\n========== OVERALL AVERAGES (ALL TESTS) ==========\n")
+                if avg_time > TIME_LIMIT:
+                    banned[key][data_type] = True
+                    print(f"  -> [WARNING: {name} exceeded {TIME_LIMIT}s. Banned for larger {data_type} arrays!]")
+
+    print("\n\n========== OVERALL AVERAGES (COMPLETED TESTS ONLY) ==========\n")
     print(f"{'Algorithm':<15} | {'Time (s)':<10} | {'Comparisons':<12} | {'Swaps'}")
     print("-" * 55)
 
     for key, (name, _) in algorithms.items():
-        grand_avg_time = overall_stats[key]["time"] / total_scenarios
-        grand_avg_comps = overall_stats[key]["comps"] // total_scenarios
-        grand_avg_swaps = overall_stats[key]["swaps"] // total_scenarios
+        runs = overall_stats[key]["completed_runs"]
         
-        print(f"{name:<15} | {grand_avg_time:.6f}   | {grand_avg_comps:<12} | {grand_avg_swaps}")
+        if runs > 0:
+            grand_avg_time = overall_stats[key]["time"] / runs
+            grand_avg_comps = overall_stats[key]["comps"] // runs
+            grand_avg_swaps = overall_stats[key]["swaps"] // runs
+            print(f"{name:<15} | {grand_avg_time:.6f}   | {grand_avg_comps:<12} | {grand_avg_swaps}")
+        else:
+            print(f"{name:<15} | {'NO RUNS COMPLETED':<10}")
     print("\n")
+
 
 if __name__ == "__main__":
     print("Sorting Experiment Program\n")
